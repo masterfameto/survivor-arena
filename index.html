@@ -120,6 +120,30 @@
     box-shadow:none;border:1px solid rgba(255,255,255,0.2);
   }
 
+  #diffSelect{
+    display:flex; gap:10px; justify-content:center; margin-top:18px;
+  }
+  .diffBtn{
+    flex:1; max-width:130px;
+    background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.18);
+    border-radius:12px;
+    color:var(--text);
+    padding:12px 8px;
+    font-size:14px; font-weight:700;
+    cursor:pointer;
+    transition:all 0.15s ease;
+    line-height:1.5;
+  }
+  .diffBtn .diffSub{ font-size:11px; font-weight:500; color:var(--muted); }
+  .diffBtn:hover{ background:rgba(139,92,246,0.15); border-color:var(--accent2); }
+  .diffBtn.selected{
+    background:rgba(139,92,246,0.28);
+    border-color:var(--accent2);
+    box-shadow:0 0 16px rgba(139,92,246,0.4);
+  }
+  .diffBtn.selected .diffSub{ color:var(--accent2); }
+
   #upgradeChoices{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;justify-content:center;}
   .choiceCard{
     background:rgba(255,255,255,0.05);
@@ -163,7 +187,7 @@
       <span>💀 <b id="killVal">0</b></span>
     </div>
     <div id="timer">00:00</div>
-    <div id="stats"><span>Wave <b id="waveVal">1</b></span></div>
+    <div id="stats"><span id="diffVal">Normal</span> · <span>Wave <b id="waveVal">1</b></span></div>
   </div>
   <div class="bar-row">
     <span class="bar-label">HP</span>
@@ -189,6 +213,11 @@
       อาวุธของคุณโจมตีอัตโนมัติ — หน้าที่คุณคือ<b>หลบ</b>และเก็บ EXP<br>
       เลเวลอัพเพื่อเลือกอัปเกรดพลัง ยิ่งอยู่นาน ศัตรูยิ่งโหด
     </p>
+    <div id="diffSelect">
+      <button class="diffBtn" data-diff="easy">😊 Easy<br><span class="diffSub">ง่าย</span></button>
+      <button class="diffBtn selected" data-diff="normal">⚔️ Normal<br><span class="diffSub">ปกติ</span></button>
+      <button class="diffBtn" data-diff="hard">💀 Hard<br><span class="diffSub">ยาก</span></button>
+    </div>
     <button class="btn" id="startBtn">▶ เริ่มเกม</button>
   </div>
 </div>
@@ -244,6 +273,14 @@ document.getElementById('muteBtn').onclick = function(){
   muted = !muted;
   this.textContent = muted ? '🔇' : '🔊';
 };
+
+// ---------- Difficulty Presets ----------
+const DIFFICULTY = {
+  easy:   { label:'Easy',   labelTh:'ง่าย', enemyHp:0.72, enemyDmg:0.62, spawnMult:0.75, bossInterval:150, playerHpMult:1.3,  weaponDmgMult:1.2  },
+  normal: { label:'Normal', labelTh:'ปกติ', enemyHp:1.0,  enemyDmg:1.0,  spawnMult:1.0,  bossInterval:120, playerHpMult:1.0,  weaponDmgMult:1.0  },
+  hard:   { label:'Hard',   labelTh:'ยาก',  enemyHp:1.45, enemyDmg:1.4,  spawnMult:1.4,  bossInterval:85,  playerHpMult:0.82, weaponDmgMult:0.88 }
+};
+let selectedDifficulty = 'normal';
 
 // ---------- Input ----------
 const keys = {};
@@ -348,6 +385,8 @@ const ENEMY_DEFS = {
 let game = null;
 
 function newGame(){
+  const diff = DIFFICULTY[selectedDifficulty] || DIFFICULTY.normal;
+  const baseHp = Math.round(150 * diff.playerHpMult);
   return {
     running:false,
     paused:false,
@@ -357,8 +396,9 @@ function newGame(){
     spawnTimer:0,
     lastBossTime:0,
     shakeTime:0, shakeMag:0,
+    diff: diff,
     player:{
-      x:0,y:0, hp:150, maxHp:150, speed:235, radius:15,
+      x:0,y:0, hp:baseHp, maxHp:baseHp, speed:235, radius:15,
       level:1, exp:0, expToNext:10,
       regen:0.3, armor:2, magnet:95,
       invuln:0, facing:0, hitFlash:0
@@ -386,8 +426,9 @@ function spawnEnemy(type, g){
   const x = g.player.x + Math.cos(angle)*dist;
   const y = g.player.y + Math.sin(angle)*dist;
   const minutes = g.time/60;
-  const hpMult = 1 + minutes*0.12;
-  const dmgMult = 1 + minutes*0.06;
+  const diff = g.diff || DIFFICULTY.normal;
+  const hpMult = (1 + minutes*0.12) * diff.enemyHp;
+  const dmgMult = (1 + minutes*0.06) * diff.enemyDmg;
   g.enemies.push({
     type, x, y,
     hp: def.hp*hpMult, maxHp: def.hp*hpMult,
@@ -417,10 +458,11 @@ function updateItemSpawning(g, dt){
 }
 
 function updateSpawning(g, dt){
+  const diff = g.diff || DIFFICULTY.normal;
   g.spawnTimer -= dt;
   if(g.spawnTimer <= 0){
     const t = g.time;
-    let interval = Math.max(0.5, 1.6 - t*0.004);
+    let interval = Math.max(0.5, 1.6 - t*0.004) / diff.spawnMult;
     g.spawnTimer = interval;
     const countThisWave = 1 + Math.floor(t/60);
     g.wave = countThisWave;
@@ -433,7 +475,7 @@ function updateSpawning(g, dt){
       if(g.enemies.length < 160) spawnEnemy(pick(pool), g);
     }
   }
-  if(g.time - g.lastBossTime >= 120 && g.time > 10){
+  if(g.time - g.lastBossTime >= diff.bossInterval && g.time > 10){
     g.lastBossTime = g.time;
     spawnEnemy('boss', g);
     beep(140, 0.6, 'sawtooth', 0.08);
@@ -442,12 +484,13 @@ function updateSpawning(g, dt){
 
 // ---------- Weapon Logic ----------
 function updateWeapons(g, dt){
+  const wMult = (g.diff || DIFFICULTY.normal).weaponDmgMult;
   for(const w of g.weapons){
     const rt = g.weaponRuntime[w.key];
     if(w.key === 'knife'){
       const count = 2 + w.level;
       const radius = 62 + w.level*4;
-      const dmg = 12 + w.level*5;
+      const dmg = (12 + w.level*5) * wMult;
       rt.angle += dt * (2.2 + w.level*0.12);
       rt.positions = [];
       for(let i=0;i<count;i++){
@@ -483,7 +526,7 @@ function updateWeapons(g, dt){
           g.projectiles.push({
             x:g.player.x, y:g.player.y,
             vx:Math.cos(ang)*520, vy:Math.sin(ang)*520,
-            dmg: 11 + w.level*6, pierce: 1 + w.level,
+            dmg: (11 + w.level*6) * wMult, pierce: 1 + w.level,
             life:1.4, radius:fbRadius, color:'#ff9f45', glow:'#ffcf8f',
             hitSet:new Set()
           });
@@ -500,7 +543,7 @@ function updateWeapons(g, dt){
         const maxJumps = 2 + Math.floor(w.level/1.5);
         const startRange = 460;
         const jumpRange = 260;
-        const baseDmg = 16 + w.level*8;
+        const baseDmg = (16 + w.level*8) * wMult;
 
         // find the first target: nearest enemy to the player within range
         let current = null, nd = Infinity;
@@ -540,7 +583,7 @@ function updateWeapons(g, dt){
         rt.cd = 0.5;
         for(const e of g.enemies){
           if(dist2(g.player.x,g.player.y,e.x,e.y) < radius*radius){
-            damageEnemy(g, e, 3.5 + w.level*2.1);
+            damageEnemy(g, e, (3.5 + w.level*2.1) * wMult);
           }
         }
       }
@@ -1147,6 +1190,7 @@ function startGame(){
   document.getElementById('gameOverOverlay').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
   document.getElementById('weaponBar').classList.remove('hidden');
+  document.getElementById('diffVal').textContent = game.diff.label;
   updateWeaponBar(game);
 }
 
@@ -1163,6 +1207,14 @@ function endGame(g){
 
 document.getElementById('startBtn').onclick = startGame;
 document.getElementById('restartBtn').onclick = startGame;
+
+document.querySelectorAll('.diffBtn').forEach(btn=>{
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.diffBtn').forEach(b=>b.classList.remove('selected'));
+    this.classList.add('selected');
+    selectedDifficulty = this.dataset.diff;
+  });
+});
 
 })();
 </script>
