@@ -254,6 +254,11 @@ function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
 window.addEventListener('resize', resize);
 resize();
 
+function getViewScale(){
+  const minDim = Math.min(canvas.width, canvas.height);
+  return clamp(minDim / 680, 0.5, 1);
+}
+
 // ---------- Audio (tiny procedural beeps, no external files) ----------
 let audioCtx = null, muted = false;
 function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } }
@@ -422,7 +427,7 @@ function newGame(){
 function spawnEnemy(type, g){
   const def = ENEMY_DEFS[type];
   const angle = rand(0, Math.PI*2);
-  const dist = Math.max(canvas.width, canvas.height)/2 + 140;
+  const dist = Math.max(canvas.width, canvas.height)/(2*getViewScale()) + 140;
   const x = g.player.x + Math.cos(angle)*dist;
   const y = g.player.y + Math.sin(angle)*dist;
   const minutes = g.time/60;
@@ -450,7 +455,7 @@ function updateItemSpawning(g, dt){
   if(g.itemSpawnTimer <= 0){
     g.itemSpawnTimer = rand(18, 26);
     const angle = rand(0, Math.PI*2);
-    const dist = rand(160, Math.max(canvas.width, canvas.height)/2 - 40);
+    const dist = rand(160, Math.max(canvas.width, canvas.height)/(2*getViewScale()) - 40);
     const x = g.player.x + Math.cos(angle)*dist;
     const y = g.player.y + Math.sin(angle)*dist;
     if(g.items.length < 6) spawnItem(g, pick(ITEM_TYPES), x, y);
@@ -928,21 +933,51 @@ function render(g){
     shakeY = rand(-g.shakeMag, g.shakeMag);
   }
 
-  const camX = canvas.width/2 - g.player.x + shakeX;
-  const camY = canvas.height/2 - g.player.y + shakeY;
-  ctx.translate(camX, camY);
+  // zoom out automatically on small screens (mobile) so more of the map is visible
+  const viewScale = getViewScale();
+  const viewW = canvas.width / viewScale;
+  const viewH = canvas.height / viewScale;
 
-  // background grid
-  ctx.strokeStyle = 'rgba(139,92,246,0.06)';
-  ctx.lineWidth = 1;
+  ctx.translate(canvas.width/2 + shakeX, canvas.height/2 + shakeY);
+  ctx.scale(viewScale, viewScale);
+  ctx.translate(-g.player.x, -g.player.y);
+
+  // background grid (checkerboard tiles so movement is easy to feel)
   const gridSize = 64;
-  const startX = Math.floor((g.player.x - canvas.width) / gridSize) * gridSize;
-  const startY = Math.floor((g.player.y - canvas.height) / gridSize) * gridSize;
-  for(let x=startX; x < g.player.x + canvas.width; x += gridSize){
-    ctx.beginPath(); ctx.moveTo(x, g.player.y-canvas.height); ctx.lineTo(x, g.player.y+canvas.height); ctx.stroke();
+  const startX = Math.floor((g.player.x - viewW/2 - gridSize) / gridSize) * gridSize;
+  const startY = Math.floor((g.player.y - viewH/2 - gridSize) / gridSize) * gridSize;
+  const endX = g.player.x + viewW/2 + gridSize;
+  const endY = g.player.y + viewH/2 + gridSize;
+
+  for(let y=startY; y < endY; y += gridSize){
+    for(let x=startX; x < endX; x += gridSize){
+      const cellX = Math.round(x/gridSize), cellY = Math.round(y/gridSize);
+      const alt = (cellX + cellY) % 2 === 0;
+      ctx.fillStyle = alt ? 'rgba(139,92,246,0.045)' : 'rgba(139,92,246,0.015)';
+      ctx.fillRect(x, y, gridSize, gridSize);
+    }
   }
-  for(let y=startY; y < g.player.y + canvas.height; y += gridSize){
-    ctx.beginPath(); ctx.moveTo(g.player.x-canvas.width, y); ctx.lineTo(g.player.x+canvas.width, y); ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(139,92,246,0.10)';
+  ctx.lineWidth = 1;
+  for(let x=startX; x < endX; x += gridSize){
+    ctx.beginPath(); ctx.moveTo(x, startY); ctx.lineTo(x, endY); ctx.stroke();
+  }
+  for(let y=startY; y < endY; y += gridSize){
+    ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke();
+  }
+
+  // brighter major grid lines every 4 tiles for a sense of scale/depth
+  const majorSize = gridSize*4;
+  const majorStartX = Math.floor((g.player.x - viewW/2 - majorSize) / majorSize) * majorSize;
+  const majorStartY = Math.floor((g.player.y - viewH/2 - majorSize) / majorSize) * majorSize;
+  ctx.strokeStyle = 'rgba(34,211,238,0.14)';
+  ctx.lineWidth = 1.5;
+  for(let x=majorStartX; x < endX; x += majorSize){
+    ctx.beginPath(); ctx.moveTo(x, startY); ctx.lineTo(x, endY); ctx.stroke();
+  }
+  for(let y=majorStartY; y < endY; y += majorSize){
+    ctx.beginPath(); ctx.moveTo(startX, y); ctx.lineTo(endX, y); ctx.stroke();
   }
 
   // aura
