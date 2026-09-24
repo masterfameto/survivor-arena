@@ -120,6 +120,34 @@
     box-shadow:none;border:1px solid rgba(255,255,255,0.2);
   }
 
+  #weaponSelectLabel{
+    font-size:12px; color:var(--muted); margin-top:20px; letter-spacing:0.5px;
+    text-transform:uppercase;
+  }
+  #weaponSelect{
+    display:flex; gap:8px; justify-content:center; margin-top:8px; flex-wrap:wrap;
+  }
+  .wpBtn{
+    flex:1; min-width:70px; max-width:100px;
+    background:rgba(255,255,255,0.05);
+    border:1px solid rgba(255,255,255,0.18);
+    border-radius:12px;
+    color:var(--text);
+    padding:10px 4px;
+    font-size:22px; font-weight:700;
+    cursor:pointer;
+    transition:all 0.15s ease;
+    line-height:1.6;
+  }
+  .wpBtn .wpSub{ font-size:10px; font-weight:500; color:var(--muted); display:block; }
+  .wpBtn:hover{ background:rgba(139,92,246,0.15); border-color:var(--accent2); }
+  .wpBtn.selected{
+    background:rgba(139,92,246,0.28);
+    border-color:var(--accent2);
+    box-shadow:0 0 16px rgba(139,92,246,0.4);
+  }
+  .wpBtn.selected .wpSub{ color:var(--accent2); }
+
   #diffSelect{
     display:flex; gap:10px; justify-content:center; margin-top:18px;
   }
@@ -213,6 +241,13 @@
       อาวุธของคุณโจมตีอัตโนมัติ — หน้าที่คุณคือ<b>หลบ</b>และเก็บ EXP<br>
       เลเวลอัพเพื่อเลือกอัปเกรดพลัง ยิ่งอยู่นาน ศัตรูยิ่งโหด
     </p>
+    <div id="weaponSelectLabel">เลือกอาวุธเริ่มต้น</div>
+    <div id="weaponSelect">
+      <button class="wpBtn selected" data-weapon="knife">🗡️<br><span class="wpSub">Orbit Blades</span></button>
+      <button class="wpBtn" data-weapon="fireball">🔥<br><span class="wpSub">Firebolt</span></button>
+      <button class="wpBtn" data-weapon="lightning">⚡<br><span class="wpSub">Chain Lightning</span></button>
+      <button class="wpBtn" data-weapon="aura">🌀<br><span class="wpSub">Blood Aura</span></button>
+    </div>
     <div id="diffSelect">
       <button class="diffBtn" data-diff="easy">😊 Easy<br><span class="diffSub">ง่าย</span></button>
       <button class="diffBtn selected" data-diff="normal">⚔️ Normal<br><span class="diffSub">ปกติ</span></button>
@@ -281,11 +316,12 @@ document.getElementById('muteBtn').onclick = function(){
 
 // ---------- Difficulty Presets ----------
 const DIFFICULTY = {
-  easy:   { label:'Easy',   labelTh:'ง่าย', enemyHp:0.72, enemyDmg:0.62, spawnMult:0.75, bossInterval:150, playerHpMult:1.3,  weaponDmgMult:1.2  },
-  normal: { label:'Normal', labelTh:'ปกติ', enemyHp:1.0,  enemyDmg:1.0,  spawnMult:1.0,  bossInterval:120, playerHpMult:1.0,  weaponDmgMult:1.0  },
-  hard:   { label:'Hard',   labelTh:'ยาก',  enemyHp:1.45, enemyDmg:1.4,  spawnMult:1.4,  bossInterval:85,  playerHpMult:0.82, weaponDmgMult:0.88 }
+  easy:   { label:'Easy',   labelTh:'ง่าย', enemyHp:0.72, enemyDmg:0.62, spawnMult:0.75, bossInterval:135, playerHpMult:1.3,  weaponDmgMult:1.2  },
+  normal: { label:'Normal', labelTh:'ปกติ', enemyHp:1.0,  enemyDmg:1.0,  spawnMult:1.0,  bossInterval:100, playerHpMult:1.0,  weaponDmgMult:1.0  },
+  hard:   { label:'Hard',   labelTh:'ยาก',  enemyHp:1.45, enemyDmg:1.4,  spawnMult:1.4,  bossInterval:70,  playerHpMult:0.82, weaponDmgMult:0.88 }
 };
 let selectedDifficulty = 'normal';
+let selectedStartWeapon = 'knife';
 
 // ---------- Input ----------
 const keys = {};
@@ -345,45 +381,48 @@ function fmtTime(t){
 const WEAPON_DEFS = {
   knife: {
     name:'Orbit Blades', icon:'🗡️', maxLevel:8,
-    desc:(lv)=> lv===0 ? 'มีดหมุนรอบตัว โจมตีศัตรู และกันกระสุนศัตรูได้' : 'เพิ่มจำนวนมีด, ดาเมจ & พื้นที่กันกระสุน',
+    desc:(lv)=> lv===0 ? 'มีดหมุนรอบตัว โจมตี+ทำให้เลือดไหล กันกระสุนได้' : 'เพิ่มจำนวนมีด, ดาเมจ, เลือดไหล & พื้นที่กันกระสุน',
   },
   fireball: {
     name:'Firebolt', icon:'🔥', maxLevel:8,
-    desc:(lv)=> lv===0 ? 'ยิงลูกไฟอัตโนมัติทะลุศัตรูหลายตัว ลูกไฟใหญ่ขึ้นตามเลเวล' : 'ทะลุได้มากขึ้น ลูกไฟใหญ่ขึ้น ดาเมจสูงขึ้น',
+    desc:(lv)=> lv===0 ? 'ยิงลูกไฟทะลุศัตรู+ติดไฟไหม้ ใหญ่ขึ้นตามเลเวล' : 'ทะลุได้มากขึ้น ลูกไฟใหญ่ขึ้น ไฟไหม้แรงขึ้น',
   },
   lightning: {
     name:'Chain Lightning', icon:'⚡', maxLevel:8,
-    desc:(lv)=> lv===0 ? 'สายฟ้ากระโดดจากศัตรูตัวใกล้สุด ไปตัวถัดไปเรื่อยๆ' : 'กระโดดได้ไกลขึ้น หลายจุดขึ้น ดาเมจสูงขึ้น',
+    desc:(lv)=> lv===0 ? 'สายฟ้ากระโดดระหว่างศัตรู+ทำให้ช็อก(สตัน)' : 'กระโดดไกล/หลายจุดขึ้น ดาเมจ & เวลาสตันสูงขึ้น',
   },
   aura: {
     name:'Blood Aura', icon:'🌀', maxLevel:8,
-    desc:(lv)=> lv===0 ? 'สร้างออร่าสร้างดาเมจรอบตัวต่อเนื่อง' : 'ขยายรัศมี & ดาเมจต่อวินาที',
+    desc:(lv)=> lv===0 ? 'ออร่าดาเมจต่อเนื่อง+ทำให้ศัตรูช้าลง (Slow)' : 'ขยายรัศมี, ดาเมจ/วิ & ทำให้ช้าลงมากขึ้น',
   }
 };
 
 const STAT_DEFS = {
-  speed:  { name:'Swift Boots',  icon:'👟', desc:'+12% ความเร็วเดิน', apply:(p)=>{ p.speed *= 1.12; } },
-  maxhp:  { name:'Vitality',     icon:'❤️', desc:'+20 พลังชีวิตสูงสุด', apply:(p)=>{ p.maxHp += 20; p.hp += 20; } },
-  armor:  { name:'Iron Skin',    icon:'🛡️', desc:'ลดดาเมจที่ได้รับ', apply:(p)=>{ p.armor += 1.2; } },
-  regen:  { name:'Regeneration', icon:'💊', desc:'+0.6 ฟื้นฟู HP/วิ', apply:(p)=>{ p.regen += 0.6; } },
-  magnet: { name:'Magnet',       icon:'🧲', desc:'ขยายระยะดูด EXP', apply:(p)=>{ p.magnet += 45; } }
+  speed:   { name:'Swift Boots',  icon:'👟', desc:'+12% ความเร็วเดิน', apply:(p)=>{ p.speed *= 1.12; } },
+  maxhp:   { name:'Vitality',     icon:'❤️', desc:'+20 พลังชีวิตสูงสุด', apply:(p)=>{ p.maxHp += 20; p.hp += 20; } },
+  armor:   { name:'Iron Skin',    icon:'🛡️', desc:'ลดดาเมจที่ได้รับ', apply:(p)=>{ p.armor += 1.2; } },
+  regen:   { name:'Regeneration', icon:'💊', desc:'+0.6 ฟื้นฟู HP/วิ', apply:(p)=>{ p.regen += 0.6; } },
+  magnet:  { name:'Magnet',       icon:'🧲', desc:'ขยายระยะดูด EXP', apply:(p)=>{ p.magnet += 45; } },
+  dmgup:   { name:'Deadly Force', icon:'💢', desc:'+12% ดาเมจอาวุธทุกชนิด', apply:(p)=>{ p.globalDmgMult *= 1.12; } },
+  atkspd:  { name:'Haste',        icon:'⏱️', desc:'+12% ความถี่การโจมตีของอาวุธทุกชนิด', apply:(p)=>{ p.globalRateMult *= 1.12; } }
 };
 
 // ---------- Drop Item Definitions ----------
 const ITEM_DEFS = {
   magnet: { icon:'🧲', color:'#22d3ee', name:'Magnet Core', label:'MAGNET!' },
   heal:   { icon:'❤️', color:'#4ade80', name:'Vital Flask', label:'+HP' },
-  bomb:   { icon:'💣', color:'#f97316', name:'Nova Bomb',  label:'BOOM!' }
+  bomb:   { icon:'💣', color:'#f97316', name:'Nova Bomb',  label:'BOOM!' },
+  chest:  { icon:'🎁', color:'#fbbf24', name:'Treasure Chest', label:'CHEST!' }
 };
-const ITEM_TYPES = Object.keys(ITEM_DEFS);
+const ITEM_TYPES = ['magnet','heal','bomb']; // 'chest' is rare and handled separately
 
 // ---------- Enemy Definitions ----------
 const ENEMY_DEFS = {
-  grunt:   { hp:22, speed:75,  dmg:8,  radius:15, color:'#b13a3a', glow:'#ff6b6b', exp:3,  shape:'circle' },
-  runner:  { hp:13, speed:145, dmg:6,  radius:11, color:'#d97f34', glow:'#ffb066', exp:4,  shape:'tri' },
-  tank:    { hp:70, speed:42,  dmg:14, radius:22, color:'#5b3a8a', glow:'#a06bff', exp:10, shape:'square' },
-  shooter: { hp:20, speed:55,  dmg:9,  radius:14, color:'#3a6fb1', glow:'#66b3ff', exp:6,  shape:'diamond', ranged:true, range:260, fireCd:2.1 },
-  boss:    { hp:550, speed:45, dmg:18, radius:42, color:'#8a1f3a', glow:'#ff3a6b', exp:150, shape:'boss' }
+  grunt:   { hp:24, speed:82,  dmg:9,  radius:15, color:'#b13a3a', glow:'#ff6b6b', exp:3,  shape:'circle' },
+  runner:  { hp:14, speed:165, dmg:7,  radius:11, color:'#d97f34', glow:'#ffb066', exp:4,  shape:'tri' },
+  tank:    { hp:85, speed:46,  dmg:17, radius:22, color:'#5b3a8a', glow:'#a06bff', exp:10, shape:'square' },
+  shooter: { hp:22, speed:60,  dmg:11, radius:14, color:'#3a6fb1', glow:'#66b3ff', exp:6,  shape:'diamond', ranged:true, range:280, fireCd:1.8 },
+  boss:    { hp:650, speed:48, dmg:22, radius:42, color:'#8a1f3a', glow:'#ff3a6b', exp:150, shape:'boss' }
 };
 
 // ---------- Game State ----------
@@ -405,10 +444,11 @@ function newGame(){
     player:{
       x:0,y:0, hp:baseHp, maxHp:baseHp, speed:235, radius:15,
       level:1, exp:0, expToNext:10,
-      regen:0.3, armor:2, magnet:95,
+      regen:0.15, armor:1, magnet:95,
+      globalDmgMult:1, globalRateMult:1,
       invuln:0, facing:0, hitFlash:0
     },
-    weapons:[ {key:'knife', level:1} ], // start with orbit blades
+    weapons:[ {key:selectedStartWeapon, level:1} ], // player-chosen starting weapon
     weaponRuntime:{ knife:{angle:0}, fireball:{cd:0}, lightning:{cd:0}, aura:{cd:0} },
     enemies:[],
     projectiles:[],
@@ -416,7 +456,7 @@ function newGame(){
     orbs:[],
     particles:[],
     items:[],
-    itemSpawnTimer:14,
+    itemSpawnTimer:26,
     magnetBoostTimer:0,
     screenFlash:0,
     screenFlashMax:0.4
@@ -432,8 +472,8 @@ function spawnEnemy(type, g){
   const y = g.player.y + Math.sin(angle)*dist;
   const minutes = g.time/60;
   const diff = g.diff || DIFFICULTY.normal;
-  const hpMult = (1 + minutes*0.12) * diff.enemyHp;
-  const dmgMult = (1 + minutes*0.06) * diff.enemyDmg;
+  const hpMult = (1 + minutes*0.18) * diff.enemyHp;
+  const dmgMult = (1 + minutes*0.10) * diff.enemyDmg;
   g.enemies.push({
     type, x, y,
     hp: def.hp*hpMult, maxHp: def.hp*hpMult,
@@ -442,7 +482,11 @@ function spawnEnemy(type, g){
     exp: def.exp, shape: def.shape,
     ranged: !!def.ranged, range: def.range||0, fireCd: 0,
     fireCdMax: def.fireCd||2, contactCd:0,
-    hitCooldowns:{}, flash:0, boss: type==='boss', angleAnim: rand(0,Math.PI*2)
+    hitCooldowns:{}, flash:0, boss: type==='boss', angleAnim: rand(0,Math.PI*2),
+    bleedStacks:0, bleedDmgPerTick:0, bleedTimer:0, bleedTickTimer:0,
+    burnDmgPerTick:0, burnTimer:0, burnTickTimer:0,
+    stunTimer:0,
+    slowTimer:0, slowFactor:1
   });
 }
 
@@ -453,12 +497,12 @@ function spawnItem(g, type, x, y){
 function updateItemSpawning(g, dt){
   g.itemSpawnTimer -= dt;
   if(g.itemSpawnTimer <= 0){
-    g.itemSpawnTimer = rand(18, 26);
+    g.itemSpawnTimer = rand(35, 50);
     const angle = rand(0, Math.PI*2);
     const dist = rand(160, Math.max(canvas.width, canvas.height)/(2*getViewScale()) - 40);
     const x = g.player.x + Math.cos(angle)*dist;
     const y = g.player.y + Math.sin(angle)*dist;
-    if(g.items.length < 6) spawnItem(g, pick(ITEM_TYPES), x, y);
+    if(g.items.length < 3) spawnItem(g, pick(ITEM_TYPES), x, y);
   }
 }
 
@@ -467,17 +511,17 @@ function updateSpawning(g, dt){
   g.spawnTimer -= dt;
   if(g.spawnTimer <= 0){
     const t = g.time;
-    let interval = Math.max(0.5, 1.6 - t*0.004) / diff.spawnMult;
+    let interval = Math.max(0.4, 1.3 - t*0.006) / diff.spawnMult;
     g.spawnTimer = interval;
     const countThisWave = 1 + Math.floor(t/60);
     g.wave = countThisWave;
     let pool = ['grunt'];
-    if(t > 30) pool.push('runner');
-    if(t > 60) pool.push('shooter');
-    if(t > 100) pool.push('tank');
+    if(t > 20) pool.push('runner');
+    if(t > 45) pool.push('shooter');
+    if(t > 75) pool.push('tank');
     const n = 1 + Math.floor(Math.random()* (1+Math.floor(t/60)));
     for(let i=0;i<n;i++){
-      if(g.enemies.length < 160) spawnEnemy(pick(pool), g);
+      if(g.enemies.length < 200) spawnEnemy(pick(pool), g);
     }
   }
   if(g.time - g.lastBossTime >= diff.bossInterval && g.time > 10){
@@ -489,14 +533,15 @@ function updateSpawning(g, dt){
 
 // ---------- Weapon Logic ----------
 function updateWeapons(g, dt){
-  const wMult = (g.diff || DIFFICULTY.normal).weaponDmgMult;
+  const wMult = (g.diff || DIFFICULTY.normal).weaponDmgMult * g.player.globalDmgMult;
+  const rMult = g.player.globalRateMult;
   for(const w of g.weapons){
     const rt = g.weaponRuntime[w.key];
     if(w.key === 'knife'){
       const count = 2 + w.level;
       const radius = 62 + w.level*4;
       const dmg = (12 + w.level*5) * wMult;
-      rt.angle += dt * (2.2 + w.level*0.12);
+      rt.angle += dt * (2.2 + w.level*0.12) * rMult;
       rt.positions = [];
       for(let i=0;i<count;i++){
         const a = rt.angle + i*(Math.PI*2/count);
@@ -510,6 +555,7 @@ function updateWeapons(g, dt){
             const cd = e.hitCooldowns[key]||0;
             if(cd <= 0){
               damageEnemy(g, e, dmg);
+              applyBleed(e, 1.6 + w.level*0.6, 3);
               e.hitCooldowns[key] = 0.45;
             }
           }
@@ -533,9 +579,9 @@ function updateWeapons(g, dt){
             vx:Math.cos(ang)*520, vy:Math.sin(ang)*520,
             dmg: (11 + w.level*6) * wMult, pierce: 1 + w.level,
             life:1.4, radius:fbRadius, color:'#ff9f45', glow:'#ffcf8f',
-            hitSet:new Set()
+            hitSet:new Set(), wlevel:w.level
           });
-          rt.cd = Math.max(0.18, 1.0 - w.level*0.09);
+          rt.cd = Math.max(0.18, 1.0 - w.level*0.09) / rMult;
         } else {
           rt.cd = 0.2;
         }
@@ -544,7 +590,7 @@ function updateWeapons(g, dt){
     else if(w.key === 'lightning'){
       rt.cd -= dt;
       if(rt.cd <= 0){
-        rt.cd = Math.max(0.7, 2.6 - w.level*0.18);
+        rt.cd = Math.max(0.7, 2.6 - w.level*0.18) / rMult;
         const maxJumps = 2 + Math.floor(w.level/1.5);
         const startRange = 460;
         const jumpRange = 260;
@@ -564,6 +610,7 @@ function updateWeapons(g, dt){
           while(current && hops < maxJumps){
             const dmg = baseDmg * Math.pow(0.86, hops);
             damageEnemy(g, current, dmg);
+            applyStun(current, 0.45 + Math.min(0.35, w.level*0.04));
             g.particles.push({type:'bolt', x1:fromX, y1:fromY, x2:current.x, y2:current.y, life:0.18, maxLife:0.18});
             visited.add(current);
             fromX = current.x; fromY = current.y;
@@ -584,8 +631,14 @@ function updateWeapons(g, dt){
     else if(w.key === 'aura'){
       rt.cd -= dt;
       const radius = 55 + w.level*11;
+      const slowFactor = clamp(0.62 - w.level*0.035, 0.28, 0.6);
+      for(const e of g.enemies){
+        if(dist2(g.player.x,g.player.y,e.x,e.y) < radius*radius){
+          applySlow(e, slowFactor, 0.35);
+        }
+      }
       if(rt.cd <= 0){
-        rt.cd = 0.5;
+        rt.cd = 0.5 / rMult;
         for(const e of g.enemies){
           if(dist2(g.player.x,g.player.y,e.x,e.y) < radius*radius){
             damageEnemy(g, e, (3.5 + w.level*2.1) * wMult);
@@ -612,11 +665,38 @@ function damageEnemy(g, e, amount){
     spawnDeathParticles(g, e.x, e.y, e.color);
     if(e.boss){
       triggerShake(g, 0.5, 14); beep(120,0.4,'sawtooth',0.08);
-      spawnItem(g, pick(ITEM_TYPES), e.x, e.y);
-    } else if(Math.random() < 0.05){
-      spawnItem(g, pick(ITEM_TYPES), e.x, e.y);
+      spawnItem(g, pick(ITEM_TYPES), e.x-18, e.y);
+      spawnItem(g, 'chest', e.x+18, e.y);
+    } else {
+      if(Math.random() < 0.02){
+        spawnItem(g, pick(ITEM_TYPES), e.x, e.y);
+      }
+      const chestCount = g.items.filter(it=>it.type==='chest').length;
+      if(chestCount < 1 && Math.random() < 0.004){
+        spawnItem(g, 'chest', e.x, e.y);
+      }
     }
   }
+}
+
+// ---------- Status Effects ----------
+function applyBleed(e, dmgPerTick, duration){
+  e.bleedStacks = Math.min(5, e.bleedStacks + 1);
+  e.bleedDmgPerTick = dmgPerTick;
+  e.bleedTimer = duration;
+  if(e.bleedTickTimer <= 0) e.bleedTickTimer = 0.5;
+}
+function applyBurn(e, dmgPerTick, duration){
+  e.burnDmgPerTick = Math.max(e.burnDmgPerTick, dmgPerTick);
+  e.burnTimer = duration;
+  if(e.burnTickTimer <= 0) e.burnTickTimer = 0.5;
+}
+function applyStun(e, duration){
+  e.stunTimer = Math.max(e.stunTimer, duration);
+}
+function applySlow(e, factor, duration){
+  e.slowFactor = factor;
+  e.slowTimer = Math.max(e.slowTimer, duration);
 }
 
 function spawnDamageParticle(g,x,y,amount){
@@ -639,16 +719,44 @@ function updateEnemies(g, dt){
   for(const e of g.enemies){
     e.flash = Math.max(0, e.flash - dt);
     e.angleAnim += dt*3;
-    if(e.ranged){
+
+    // status effects: bleed & burn tick damage over time
+    if(e.bleedTimer > 0){
+      e.bleedTimer -= dt;
+      e.bleedTickTimer -= dt;
+      if(e.bleedTickTimer <= 0 && e.hp > 0){
+        e.bleedTickTimer = 0.5;
+        damageEnemy(g, e, e.bleedDmgPerTick * e.bleedStacks);
+      }
+      if(e.bleedTimer <= 0){ e.bleedStacks = 0; e.bleedDmgPerTick = 0; }
+    }
+    if(e.burnTimer > 0){
+      e.burnTimer -= dt;
+      e.burnTickTimer -= dt;
+      if(e.burnTickTimer <= 0 && e.hp > 0){
+        e.burnTickTimer = 0.5;
+        damageEnemy(g, e, e.burnDmgPerTick);
+      }
+      if(e.burnTimer <= 0){ e.burnDmgPerTick = 0; }
+    }
+    if(e.stunTimer > 0) e.stunTimer -= dt;
+    const stunned = e.stunTimer > 0;
+
+    if(e.slowTimer > 0){ e.slowTimer -= dt; } else { e.slowFactor = 1; }
+    const spd = e.speed * e.slowFactor;
+
+    if(stunned){
+      // stunned enemies can't move or attack this frame
+    } else if(e.ranged){
       const d = Math.sqrt(dist2(e.x,e.y,g.player.x,g.player.y));
       if(d > e.range*0.6){
         const a = Math.atan2(g.player.y-e.y, g.player.x-e.x);
-        e.x += Math.cos(a)*e.speed*dt;
-        e.y += Math.sin(a)*e.speed*dt;
+        e.x += Math.cos(a)*spd*dt;
+        e.y += Math.sin(a)*spd*dt;
       } else if(d < e.range*0.35){
         const a = Math.atan2(e.y-g.player.y, e.x-g.player.x);
-        e.x += Math.cos(a)*e.speed*dt*0.7;
-        e.y += Math.sin(a)*e.speed*dt*0.7;
+        e.x += Math.cos(a)*spd*dt*0.7;
+        e.y += Math.sin(a)*spd*dt*0.7;
       }
       e.fireCd -= dt;
       if(e.fireCd <= 0 && d < e.range){
@@ -658,13 +766,13 @@ function updateEnemies(g, dt){
       }
     } else {
       const a = Math.atan2(g.player.y-e.y, g.player.x-e.x);
-      e.x += Math.cos(a)*e.speed*dt;
-      e.y += Math.sin(a)*e.speed*dt;
+      e.x += Math.cos(a)*spd*dt;
+      e.y += Math.sin(a)*spd*dt;
     }
-    // contact damage
+    // contact damage (stunned enemies can't land contact hits either)
     e.contactCd -= dt;
     const rr = (e.radius+g.player.radius)*(e.radius+g.player.radius);
-    if(dist2(e.x,e.y,g.player.x,g.player.y) < rr && e.contactCd <= 0 && g.player.invuln <= 0){
+    if(!stunned && dist2(e.x,e.y,g.player.x,g.player.y) < rr && e.contactCd <= 0 && g.player.invuln <= 0){
       applyDamageToPlayer(g, e.dmg);
       e.contactCd = 0.8;
     }
@@ -682,6 +790,7 @@ function updateEnemies(g, dt){
       const rr = (e.radius+p.radius)*(e.radius+p.radius);
       if(dist2(p.x,p.y,e.x,e.y) < rr){
         damageEnemy(g, e, p.dmg);
+        applyBurn(e, 2.5 + (p.wlevel||1)*1.3, 3);
         if(p.hitSet) p.hitSet.add(e);
         p.pierce--;
         if(p.pierce < 0) return false;
@@ -737,7 +846,17 @@ function updateEnemies(g, dt){
   });
 
   // drop items
-  for(const it of g.items) it.bob += dt*4;
+  for(const it of g.items){
+    it.bob += dt*4;
+    if(g.magnetBoostTimer > 0){
+      const d = Math.sqrt(dist2(it.x,it.y,g.player.x,g.player.y));
+      if(d > 1){
+        const a = Math.atan2(g.player.y-it.y, g.player.x-it.x);
+        it.x += Math.cos(a)*560*dt;
+        it.y += Math.sin(a)*560*dt;
+      }
+    }
+  }
   g.items = g.items.filter(it=>{
     const rr = (g.player.radius+it.radius)*(g.player.radius+it.radius);
     if(dist2(it.x,it.y,g.player.x,g.player.y) < rr){
@@ -772,15 +891,41 @@ function applyDamageToPlayer(g, amount){
 function applyItem(g, item){
   const def = ITEM_DEFS[item.type];
   spawnDeathParticles(g, item.x, item.y, def.color);
-  g.particles.push({type:'text', x:item.x, y:item.y-10, text:def.label, life:0.8, maxLife:0.8, vy:-30});
   if(item.type === 'heal'){
+    g.particles.push({type:'text', x:item.x, y:item.y-10, text:def.label, life:0.8, maxLife:0.8, vy:-30});
     g.player.hp = Math.min(g.player.maxHp, g.player.hp + Math.round(g.player.maxHp*0.3));
     beep(520, 0.18, 'sine', 0.07);
   } else if(item.type === 'magnet'){
+    g.particles.push({type:'text', x:item.x, y:item.y-10, text:def.label, life:0.8, maxLife:0.8, vy:-30});
     g.magnetBoostTimer = 2.2;
     beep(760, 0.2, 'triangle', 0.06);
   } else if(item.type === 'bomb'){
+    g.particles.push({type:'text', x:item.x, y:item.y-10, text:def.label, life:0.8, maxLife:0.8, vy:-30});
     triggerBombExplosion(g);
+  } else if(item.type === 'chest'){
+    const ownedKeys = g.weapons.map(w=>w.key);
+    const newOptions = Object.keys(WEAPON_DEFS).filter(k=>!ownedKeys.includes(k));
+    const upgradable = g.weapons.filter(w=>w.level < WEAPON_DEFS[w.key].maxLevel);
+    const giveNew = newOptions.length>0 && (upgradable.length===0 || Math.random() < 0.5);
+    let resultText = 'CHEST!';
+    if(giveNew){
+      const key = pick(newOptions);
+      g.weapons.push({key, level:1});
+      resultText = 'NEW: ' + WEAPON_DEFS[key].name;
+    } else if(upgradable.length > 0){
+      const w = pick(upgradable);
+      w.level++;
+      resultText = WEAPON_DEFS[w.key].name + ' Lv.' + w.level;
+    } else {
+      const sk = pick(Object.keys(STAT_DEFS));
+      STAT_DEFS[sk].apply(g.player);
+      resultText = 'BONUS: ' + STAT_DEFS[sk].name;
+    }
+    updateWeaponBar(g);
+    g.particles.push({type:'text', x:item.x, y:item.y-10, text:resultText, life:1.1, maxLife:1.1, vy:-26});
+    triggerShake(g, 0.25, 8);
+    beep(880, 0.12, 'triangle', 0.08);
+    beep(1180, 0.16, 'triangle', 0.08);
   }
 }
 
@@ -844,14 +989,7 @@ function buildUpgradeOptions(g){
       options.push({type:'weapon-up', key:w.key});
     }
   }
-  // new weapons
-  const ownedKeys = g.weapons.map(w=>w.key);
-  for(const key in WEAPON_DEFS){
-    if(!ownedKeys.includes(key) && g.weapons.length < 4){
-      options.push({type:'weapon-new', key});
-    }
-  }
-  // stats
+  // stats (includes global damage & attack-speed boosts)
   for(const key in STAT_DEFS){
     options.push({type:'stat', key});
   }
@@ -879,11 +1017,6 @@ function showLevelUpModal(g){
       icon = def.icon; name = def.name + ' +1';
       desc = def.desc(w.level);
       lvlText = 'Lv.'+w.level+' → '+(w.level+1);
-    } else if(opt.type === 'weapon-new'){
-      const def = WEAPON_DEFS[opt.key];
-      icon = def.icon; name = def.name + ' (ใหม่)';
-      desc = def.desc(0);
-      lvlText = 'อาวุธใหม่';
     } else {
       const def = STAT_DEFS[opt.key];
       icon = def.icon; name = def.name;
@@ -900,9 +1033,6 @@ function applyUpgrade(g, opt){
   if(opt.type === 'weapon-up'){
     const w = g.weapons.find(w=>w.key===opt.key);
     w.level++;
-  } else if(opt.type === 'weapon-new'){
-    g.weapons.push({key:opt.key, level:1});
-    if(!g.weaponRuntime[opt.key]) g.weaponRuntime[opt.key] = {};
   } else if(opt.type === 'stat'){
     STAT_DEFS[opt.key].apply(g.player);
   }
@@ -1030,6 +1160,45 @@ function render(g){
     ctx.fillStyle = e.flash > 0 ? '#ffffff' : e.color;
     drawShape(e.shape, e.radius);
     ctx.restore();
+
+    // status effect overlays
+    if(e.burnTimer > 0){
+      ctx.save();
+      ctx.globalAlpha = 0.35 + Math.sin(e.angleAnim*3)*0.15;
+      ctx.fillStyle = '#ff9f45';
+      ctx.shadowColor = '#ff9f45'; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.radius*0.85, 0, Math.PI*2); ctx.fill();
+      ctx.restore();
+    }
+    if(e.bleedStacks > 0){
+      ctx.save();
+      ctx.strokeStyle = '#dc2626';
+      ctx.globalAlpha = 0.7;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.radius+3, 0, Math.PI*2); ctx.stroke();
+      ctx.restore();
+    }
+    if(e.slowTimer > 0){
+      ctx.save();
+      ctx.strokeStyle = '#7dd3fc';
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([3,3]);
+      ctx.beginPath(); ctx.arc(e.x, e.y, e.radius+6, 0, Math.PI*2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+    if(e.stunTimer > 0){
+      ctx.save();
+      ctx.translate(e.x, e.y - e.radius - 16);
+      ctx.rotate(Math.sin(e.angleAnim*6)*0.3);
+      ctx.font = '15px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#fde047'; ctx.shadowBlur = 8;
+      ctx.fillText('⚡', 0, 0);
+      ctx.restore();
+    }
+
     // hp bar for tanks/boss
     if(e.boss || e.maxHp > 40){
       const w = e.radius*2;
@@ -1248,6 +1417,14 @@ document.querySelectorAll('.diffBtn').forEach(btn=>{
     document.querySelectorAll('.diffBtn').forEach(b=>b.classList.remove('selected'));
     this.classList.add('selected');
     selectedDifficulty = this.dataset.diff;
+  });
+});
+
+document.querySelectorAll('.wpBtn').forEach(btn=>{
+  btn.addEventListener('click', function(){
+    document.querySelectorAll('.wpBtn').forEach(b=>b.classList.remove('selected'));
+    this.classList.add('selected');
+    selectedStartWeapon = this.dataset.weapon;
   });
 });
 
