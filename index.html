@@ -472,8 +472,8 @@ function spawnEnemy(type, g){
   const y = g.player.y + Math.sin(angle)*dist;
   const minutes = g.time/60;
   const diff = g.diff || DIFFICULTY.normal;
-  const hpMult = (1 + minutes*0.18) * diff.enemyHp;
-  const dmgMult = (1 + minutes*0.10) * diff.enemyDmg;
+  const hpMult = (1 + minutes*0.26) * diff.enemyHp;
+  const dmgMult = (1 + minutes*0.15) * diff.enemyDmg;
   g.enemies.push({
     type, x, y,
     hp: def.hp*hpMult, maxHp: def.hp*hpMult,
