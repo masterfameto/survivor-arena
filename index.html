@@ -75,6 +75,11 @@
     font-size:9px;font-weight:700;
     padding:1px 4px;border-radius:6px;
   }
+  .wIcon.evolved{
+    border-color:var(--gold);
+    box-shadow:0 0 10px rgba(251,191,36,0.6);
+  }
+  .wIcon.evolved .lvl{ background:var(--gold); color:#3a2a06; }
 
   .modal-overlay{
     position:fixed;top:0;left:0;width:100%;height:100%;
@@ -173,6 +178,7 @@
   .diffBtn.selected .diffSub{ color:var(--accent2); }
 
   #upgradeChoices{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;justify-content:center;}
+  #evolveChoices{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;justify-content:center;}
   .choiceCard{
     background:rgba(255,255,255,0.05);
     border:1px solid rgba(139,92,246,0.3);
@@ -262,6 +268,14 @@
     <h1>⚡ LEVEL UP!</h1>
     <h2 id="newLevelText">เลือกอัปเกรด 1 อย่าง</h2>
     <div id="upgradeChoices"></div>
+  </div>
+</div>
+
+<div id="evolveOverlay" class="modal-overlay hidden">
+  <div class="panel">
+    <h1>🔮 EVOLUTION CORE!</h1>
+    <h2>เลือกอาวุธที่จะกลายร่าง</h2>
+    <div id="evolveChoices"></div>
   </div>
 </div>
 
@@ -409,12 +423,21 @@ const STAT_DEFS = {
 
 // ---------- Drop Item Definitions ----------
 const ITEM_DEFS = {
-  magnet: { icon:'🧲', color:'#22d3ee', name:'Magnet Core', label:'MAGNET!' },
-  heal:   { icon:'❤️', color:'#4ade80', name:'Vital Flask', label:'+HP' },
-  bomb:   { icon:'💣', color:'#f97316', name:'Nova Bomb',  label:'BOOM!' },
-  chest:  { icon:'🎁', color:'#fbbf24', name:'Treasure Chest', label:'CHEST!' }
+  magnet:  { icon:'🧲', color:'#22d3ee', name:'Magnet Core', label:'MAGNET!' },
+  heal:    { icon:'❤️', color:'#4ade80', name:'Vital Flask', label:'+HP' },
+  bomb:    { icon:'💣', color:'#f97316', name:'Nova Bomb',  label:'BOOM!' },
+  chest:   { icon:'🎁', color:'#fbbf24', name:'Treasure Chest', label:'CHEST!' },
+  evocore: { icon:'🔮', color:'#a78bfa', name:'Evolution Core', label:'CORE!' }
 };
-const ITEM_TYPES = ['magnet','heal','bomb']; // 'chest' is rare and handled separately
+const ITEM_TYPES = ['magnet','heal','bomb']; // 'chest' and 'evocore' are rare and handled separately
+
+// ---------- Weapon Evolutions (require a maxed weapon + an Evolution Core) ----------
+const WEAPON_EVOLUTIONS = {
+  knife:     { name:'Blade Vortex',   icon:'🌪️', desc:'มีดเพิ่มเท่าตัว หมุนเร็วขึ้น + ปล่อยคลื่นกระแทกเป็นระยะ' },
+  fireball:  { name:'Inferno Cannon', icon:'☄️', desc:'ยิงรัว 3 นัดต่อครั้ง + จุดไฟลามใส่ศัตรูข้างเคียง' },
+  lightning: { name:'Storm Nova',     icon:'🌩️', desc:'ฟาดศัตรูทุกตัวในรัศมีพร้อมกัน + สตันการันตี' },
+  aura:      { name:'Void Aura',      icon:'🕳️', desc:'ออร่ากลายเป็นหลุมดำ ดูดศัตรูเข้าหาศูนย์กลาง + ดาเมจแรงขึ้น' }
+};
 
 // ---------- Enemy Definitions ----------
 const ENEMY_DEFS = {
@@ -445,7 +468,7 @@ function newGame(){
       x:0,y:0, hp:baseHp, maxHp:baseHp, speed:235, radius:15,
       level:1, exp:0, expToNext:10,
       regen:0.15, armor:1, magnet:95,
-      globalDmgMult:1, globalRateMult:1,
+      globalDmgMult:1, globalRateMult:1, evoCores:0,
       invuln:0, facing:0, hitFlash:0
     },
     weapons:[ {key:selectedStartWeapon, level:1} ], // player-chosen starting weapon
@@ -538,10 +561,10 @@ function updateWeapons(g, dt){
   for(const w of g.weapons){
     const rt = g.weaponRuntime[w.key];
     if(w.key === 'knife'){
-      const count = 2 + w.level;
+      const count = w.evolved ? (2 + w.level)*2 : 2 + w.level;
       const radius = 62 + w.level*4;
       const dmg = (12 + w.level*5) * wMult;
-      rt.angle += dt * (2.2 + w.level*0.12) * rMult;
+      rt.angle += dt * (2.2 + w.level*0.12) * rMult * (w.evolved ? 1.5 : 1);
       rt.positions = [];
       for(let i=0;i<count;i++){
         const a = rt.angle + i*(Math.PI*2/count);
@@ -561,6 +584,22 @@ function updateWeapons(g, dt){
           }
         }
       }
+      if(w.evolved){
+        rt.vortexCd = (rt.vortexCd||0) - dt;
+        if(rt.vortexCd <= 0){
+          rt.vortexCd = 2.4 / rMult;
+          const burstRadius = radius * 1.7;
+          for(const e of g.enemies){
+            if(dist2(g.player.x,g.player.y,e.x,e.y) < burstRadius*burstRadius){
+              damageEnemy(g, e, dmg*1.3);
+              applyBleed(e, 1.6 + w.level*0.6, 3);
+            }
+          }
+          g.particles.push({type:'spark', x:g.player.x, y:g.player.y, vx:0, vy:0, life:0.3, maxLife:0.3, color:'#c7d2fe'});
+          triggerShake(g, 0.15, 5);
+          beep(300, 0.12, 'square', 0.05);
+        }
+      }
     }
     else if(w.key === 'fireball'){
       rt.cd -= dt;
@@ -574,13 +613,17 @@ function updateWeapons(g, dt){
         if(nearest){
           const ang = Math.atan2(nearest.y-g.player.y, nearest.x-g.player.x);
           const fbRadius = 8 + w.level*2.4;
-          g.projectiles.push({
-            x:g.player.x, y:g.player.y,
-            vx:Math.cos(ang)*520, vy:Math.sin(ang)*520,
-            dmg: (11 + w.level*6) * wMult, pierce: 1 + w.level,
-            life:1.4, radius:fbRadius, color:'#ff9f45', glow:'#ffcf8f',
-            hitSet:new Set(), wlevel:w.level
-          });
+          const shots = w.evolved ? [-0.14, 0, 0.14] : [0];
+          for(const spread of shots){
+            const a2 = ang + spread;
+            g.projectiles.push({
+              x:g.player.x, y:g.player.y,
+              vx:Math.cos(a2)*520, vy:Math.sin(a2)*520,
+              dmg: (11 + w.level*6) * wMult, pierce: 1 + w.level,
+              life:1.4, radius:fbRadius, color:'#ff9f45', glow:'#ffcf8f',
+              hitSet:new Set(), wlevel:w.level, evolved:w.evolved
+            });
+          }
           rt.cd = Math.max(0.18, 1.0 - w.level*0.09) / rMult;
         } else {
           rt.cd = 0.2;
@@ -591,40 +634,59 @@ function updateWeapons(g, dt){
       rt.cd -= dt;
       if(rt.cd <= 0){
         rt.cd = Math.max(0.7, 2.6 - w.level*0.18) / rMult;
-        const maxJumps = 2 + Math.floor(w.level/1.5);
-        const startRange = 460;
-        const jumpRange = 260;
         const baseDmg = (16 + w.level*8) * wMult;
 
-        // find the first target: nearest enemy to the player within range
-        let current = null, nd = Infinity;
-        for(const e of g.enemies){
-          const d = dist2(g.player.x,g.player.y,e.x,e.y);
-          if(d < startRange*startRange && d < nd){ nd = d; current = e; }
-        }
-
-        if(current){
-          const visited = new Set();
-          let fromX = g.player.x, fromY = g.player.y;
-          let hops = 0;
-          while(current && hops < maxJumps){
-            const dmg = baseDmg * Math.pow(0.86, hops);
-            damageEnemy(g, current, dmg);
-            applyStun(current, 0.45 + Math.min(0.35, w.level*0.04));
-            g.particles.push({type:'bolt', x1:fromX, y1:fromY, x2:current.x, y2:current.y, life:0.18, maxLife:0.18});
-            visited.add(current);
-            fromX = current.x; fromY = current.y;
-            hops++;
-            // find nearest un-hit enemy within jump range from the current target
-            let next = null, bd = Infinity;
-            for(const e of g.enemies){
-              if(visited.has(e)) continue;
-              const d = dist2(fromX,fromY,e.x,e.y);
-              if(d < jumpRange*jumpRange && d < bd){ bd = d; next = e; }
+        if(w.evolved){
+          // Storm Nova: strike every enemy in a wide radius simultaneously, guaranteed stun
+          const novaRadius = 480;
+          let hitAny = false;
+          for(const e of g.enemies){
+            if(dist2(g.player.x,g.player.y,e.x,e.y) < novaRadius*novaRadius){
+              damageEnemy(g, e, baseDmg);
+              applyStun(e, 0.9 + Math.min(0.4, w.level*0.03));
+              g.particles.push({type:'bolt', x1:g.player.x, y1:g.player.y, x2:e.x, y2:e.y, life:0.2, maxLife:0.2});
+              hitAny = true;
             }
-            current = next;
           }
-          beep(600, 0.08, 'square', 0.04);
+          if(hitAny){
+            triggerShake(g, 0.25, 8);
+            beep(500, 0.15, 'square', 0.06);
+          }
+        } else {
+          const maxJumps = 2 + Math.floor(w.level/1.5);
+          const startRange = 460;
+          const jumpRange = 260;
+
+          // find the first target: nearest enemy to the player within range
+          let current = null, nd = Infinity;
+          for(const e of g.enemies){
+            const d = dist2(g.player.x,g.player.y,e.x,e.y);
+            if(d < startRange*startRange && d < nd){ nd = d; current = e; }
+          }
+
+          if(current){
+            const visited = new Set();
+            let fromX = g.player.x, fromY = g.player.y;
+            let hops = 0;
+            while(current && hops < maxJumps){
+              const dmg = baseDmg * Math.pow(0.86, hops);
+              damageEnemy(g, current, dmg);
+              applyStun(current, 0.45 + Math.min(0.35, w.level*0.04));
+              g.particles.push({type:'bolt', x1:fromX, y1:fromY, x2:current.x, y2:current.y, life:0.18, maxLife:0.18});
+              visited.add(current);
+              fromX = current.x; fromY = current.y;
+              hops++;
+              // find nearest un-hit enemy within jump range from the current target
+              let next = null, bd = Infinity;
+              for(const e of g.enemies){
+                if(visited.has(e)) continue;
+                const d = dist2(fromX,fromY,e.x,e.y);
+                if(d < jumpRange*jumpRange && d < bd){ bd = d; next = e; }
+              }
+              current = next;
+            }
+            beep(600, 0.08, 'square', 0.04);
+          }
         }
       }
     }
@@ -632,16 +694,27 @@ function updateWeapons(g, dt){
       rt.cd -= dt;
       const radius = 55 + w.level*11;
       const slowFactor = clamp(0.62 - w.level*0.035, 0.28, 0.6);
+      const dmgScale = w.evolved ? 1.6 : 1;
       for(const e of g.enemies){
         if(dist2(g.player.x,g.player.y,e.x,e.y) < radius*radius){
-          applySlow(e, slowFactor, 0.35);
+          if(w.evolved){
+            // Void Aura: pull enemies toward the center instead of just slowing them
+            const d = Math.sqrt(dist2(g.player.x,g.player.y,e.x,e.y));
+            if(d > 4){
+              const a = Math.atan2(g.player.y-e.y, g.player.x-e.x);
+              e.x += Math.cos(a)*140*dt;
+              e.y += Math.sin(a)*140*dt;
+            }
+          } else {
+            applySlow(e, slowFactor, 0.35);
+          }
         }
       }
       if(rt.cd <= 0){
         rt.cd = 0.5 / rMult;
         for(const e of g.enemies){
           if(dist2(g.player.x,g.player.y,e.x,e.y) < radius*radius){
-            damageEnemy(g, e, (3.5 + w.level*2.1) * wMult);
+            damageEnemy(g, e, (3.5 + w.level*2.1) * wMult * dmgScale);
           }
         }
       }
@@ -665,8 +738,9 @@ function damageEnemy(g, e, amount){
     spawnDeathParticles(g, e.x, e.y, e.color);
     if(e.boss){
       triggerShake(g, 0.5, 14); beep(120,0.4,'sawtooth',0.08);
-      spawnItem(g, pick(ITEM_TYPES), e.x-18, e.y);
-      spawnItem(g, 'chest', e.x+18, e.y);
+      spawnItem(g, pick(ITEM_TYPES), e.x-24, e.y);
+      spawnItem(g, 'chest', e.x, e.y);
+      if(Math.random() < 0.35) spawnItem(g, 'evocore', e.x+24, e.y);
     } else {
       if(Math.random() < 0.02){
         spawnItem(g, pick(ITEM_TYPES), e.x, e.y);
@@ -674,6 +748,10 @@ function damageEnemy(g, e, amount){
       const chestCount = g.items.filter(it=>it.type==='chest').length;
       if(chestCount < 1 && Math.random() < 0.004){
         spawnItem(g, 'chest', e.x, e.y);
+      }
+      const coreCount = g.items.filter(it=>it.type==='evocore').length;
+      if(coreCount < 1 && Math.random() < 0.0012){
+        spawnItem(g, 'evocore', e.x, e.y);
       }
     }
   }
@@ -791,6 +869,15 @@ function updateEnemies(g, dt){
       if(dist2(p.x,p.y,e.x,e.y) < rr){
         damageEnemy(g, e, p.dmg);
         applyBurn(e, 2.5 + (p.wlevel||1)*1.3, 3);
+        if(p.evolved){
+          const spreadRadius = 70;
+          for(const other of g.enemies){
+            if(other === e || other.hp <= 0) continue;
+            if(dist2(e.x,e.y,other.x,other.y) < spreadRadius*spreadRadius){
+              applyBurn(other, 1.5 + (p.wlevel||1)*0.8, 2.5);
+            }
+          }
+        }
         if(p.hitSet) p.hitSet.add(e);
         p.pierce--;
         if(p.pierce < 0) return false;
@@ -926,7 +1013,65 @@ function applyItem(g, item){
     triggerShake(g, 0.25, 8);
     beep(880, 0.12, 'triangle', 0.08);
     beep(1180, 0.16, 'triangle', 0.08);
+    checkEvolutions(g);
+  } else if(item.type === 'evocore'){
+    g.player.evoCores++;
+    g.particles.push({type:'text', x:item.x, y:item.y-10, text:'+1 EVOLUTION CORE', life:1.1, maxLife:1.1, vy:-26});
+    triggerShake(g, 0.2, 6);
+    beep(950, 0.14, 'sine', 0.07);
+    beep(1300, 0.18, 'sine', 0.07);
+    checkEvolutions(g);
   }
+}
+
+// ---------- Weapon Evolution System ----------
+function checkEvolutions(g){
+  const candidates = g.weapons.filter(w =>
+    w.level >= WEAPON_DEFS[w.key].maxLevel && !w.evolved && WEAPON_EVOLUTIONS[w.key]
+  );
+  if(candidates.length === 0 || g.player.evoCores <= 0) return;
+  if(candidates.length === 1){
+    consumeCoreAndEvolve(g, candidates[0]);
+  } else {
+    g.paused = true;
+    showEvolveModal(g, candidates);
+  }
+}
+
+function consumeCoreAndEvolve(g, w){
+  g.player.evoCores--;
+  w.evolved = true;
+  const evo = WEAPON_EVOLUTIONS[w.key];
+  triggerShake(g, 0.4, 12);
+  beep(660, 0.15, 'triangle', 0.09);
+  beep(990, 0.15, 'triangle', 0.09);
+  beep(1320, 0.25, 'triangle', 0.09);
+  g.particles.push({type:'text', x:g.player.x, y:g.player.y-40, text:'EVOLVED: '+evo.name, life:1.4, maxLife:1.4, vy:-22});
+  updateWeaponBar(g);
+}
+
+function showEvolveModal(g, candidates){
+  const overlay = document.getElementById('evolveOverlay');
+  const container = document.getElementById('evolveChoices');
+  container.innerHTML = '';
+  for(const w of candidates){
+    const evo = WEAPON_EVOLUTIONS[w.key];
+    const base = WEAPON_DEFS[w.key];
+    const card = document.createElement('div');
+    card.className = 'choiceCard';
+    card.innerHTML = '<div class="cIcon">'+evo.icon+'</div><div class="cName">'+evo.name+'</div><div class="cDesc">'+evo.desc+'</div><div class="cLvl">จาก '+base.name+' (MAX)</div>';
+    card.onclick = function(){
+      consumeCoreAndEvolve(g, w);
+      overlay.classList.add('hidden');
+      checkEvolutions(g); // in case another core + candidate remain
+      if(!isEvolveModalVisible()) g.paused = false;
+    };
+    container.appendChild(card);
+  }
+  overlay.classList.remove('hidden');
+}
+function isEvolveModalVisible(){
+  return !document.getElementById('evolveOverlay').classList.contains('hidden');
 }
 
 function triggerBombExplosion(g){
@@ -1023,7 +1168,7 @@ function showLevelUpModal(g){
       desc = def.desc;
     }
     card.innerHTML = '<div class="cIcon">'+icon+'</div><div class="cName">'+name+'</div><div class="cDesc">'+desc+'</div>'+(lvlText?'<div class="cLvl">'+lvlText+'</div>':'');
-    card.onclick = function(){ applyUpgrade(g, opt); overlay.classList.add('hidden'); g.paused=false; };
+    card.onclick = function(){ applyUpgrade(g, opt); overlay.classList.add('hidden'); if(!isEvolveModalVisible()) g.paused=false; };
     container.appendChild(card);
   }
   overlay.classList.remove('hidden');
@@ -1033,6 +1178,7 @@ function applyUpgrade(g, opt){
   if(opt.type === 'weapon-up'){
     const w = g.weapons.find(w=>w.key===opt.key);
     w.level++;
+    checkEvolutions(g);
   } else if(opt.type === 'stat'){
     STAT_DEFS[opt.key].apply(g.player);
   }
@@ -1043,10 +1189,10 @@ function updateWeaponBar(g){
   const bar = document.getElementById('weaponBar');
   bar.innerHTML = '';
   for(const w of g.weapons){
-    const def = WEAPON_DEFS[w.key];
+    const def = w.evolved ? WEAPON_EVOLUTIONS[w.key] : WEAPON_DEFS[w.key];
     const div = document.createElement('div');
-    div.className = 'wIcon';
-    div.innerHTML = def.icon + '<span class="lvl">'+w.level+'</span>';
+    div.className = 'wIcon' + (w.evolved ? ' evolved' : '');
+    div.innerHTML = def.icon + '<span class="lvl">'+(w.evolved ? 'MAX' : w.level)+'</span>';
     bar.appendChild(div);
   }
 }
