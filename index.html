@@ -1288,12 +1288,12 @@ function render(g){
     for(let x=startX; x < endX; x += gridSize){
       const cellX = Math.round(x/gridSize), cellY = Math.round(y/gridSize);
       const alt = (cellX + cellY) % 2 === 0;
-      ctx.fillStyle = alt ? 'rgba(139,92,246,0.045)' : 'rgba(139,92,246,0.015)';
+      ctx.fillStyle = alt ? 'rgba(51,65,90,0.05)' : 'rgba(51,65,90,0.02)';
       ctx.fillRect(x, y, gridSize, gridSize);
     }
   }
 
-  ctx.strokeStyle = 'rgba(139,92,246,0.10)';
+  ctx.strokeStyle = 'rgba(71,85,105,0.12)';
   ctx.lineWidth = 1;
   for(let x=startX; x < endX; x += gridSize){
     ctx.beginPath(); ctx.moveTo(x, startY); ctx.lineTo(x, endY); ctx.stroke();
@@ -1557,8 +1557,12 @@ function drawShape(shape, r){
     ctx.moveTo(0,-r); ctx.lineTo(r,0); ctx.lineTo(0,r); ctx.lineTo(-r,0); ctx.closePath();
   }
   ctx.fill();
+  // dark outline on every enemy so it reads clearly against any background color
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
   if(shape==='boss'){
-    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
     ctx.lineWidth = 3;
     ctx.stroke();
   }
