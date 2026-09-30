@@ -463,6 +463,7 @@ function newGame(){
   return {
     running:false,
     paused:false,
+    awaitingResume:false,
     time:0,
     kills:0,
     wave:1,
@@ -501,8 +502,8 @@ function spawnEnemy(type, g){
   const y = g.player.y + Math.sin(angle)*dist;
   const minutes = g.time/60;
   const diff = g.diff || DIFFICULTY.normal;
-  const hpMult = (1 + minutes*0.26) * diff.enemyHp;
-  const dmgMult = (1 + minutes*0.15) * diff.enemyDmg;
+  const hpMult = (1 + minutes*0.38) * diff.enemyHp;
+  const dmgMult = (1 + minutes*0.22) * diff.enemyDmg;
   g.enemies.push({
     type, x, y,
     hp: def.hp*hpMult, maxHp: def.hp*hpMult,
@@ -845,7 +846,7 @@ function spawnDeathParticles(g,x,y,color){
     g.particles.push({type:'spark', x,y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp, life:0.4, maxLife:0.4, color});
   }
 }
-function triggerShake(g, time, mag){ g.shakeTime = time; g.shakeMag = mag; }
+function triggerShake(g, time, mag){ /* screen shake disabled — was too frequent/uncomfortable */ }
 
 // ---------- Enemy / Projectile Update ----------
 function updateEnemies(g, dt){
@@ -1123,7 +1124,7 @@ function showEvolveModal(g, candidates){
       consumeCoreAndEvolve(g, w);
       overlay.classList.add('hidden');
       checkEvolutions(g); // in case another core + candidate remain
-      if(!isEvolveModalVisible()) g.paused = false;
+      if(!isEvolveModalVisible()) armResumeOnMove(g);
     };
     container.appendChild(card);
   }
@@ -1227,7 +1228,7 @@ function showLevelUpModal(g){
       desc = def.desc;
     }
     card.innerHTML = '<div class="cIcon">'+icon+'</div><div class="cName">'+name+'</div><div class="cDesc">'+desc+'</div>'+(lvlText?'<div class="cLvl">'+lvlText+'</div>':'');
-    card.onclick = function(){ applyUpgrade(g, opt); overlay.classList.add('hidden'); if(!isEvolveModalVisible()) g.paused=false; };
+    card.onclick = function(){ applyUpgrade(g, opt); overlay.classList.add('hidden'); if(!isEvolveModalVisible()) armResumeOnMove(g); };
     container.appendChild(card);
   }
   overlay.classList.remove('hidden');
@@ -1579,12 +1580,33 @@ function updateHUD(g){
 }
 
 // ---------- Game Loop ----------
+function armResumeOnMove(g){
+  g.paused = true;
+  g.awaitingResume = true;
+}
+function isMovementInputActive(){
+  if(joystick.active){
+    const jdx = joystick.curX - joystick.baseX;
+    const jdy = joystick.curY - joystick.baseY;
+    if(Math.sqrt(jdx*jdx + jdy*jdy) > 6) return true;
+  }
+  return !!(keys['w']||keys['a']||keys['s']||keys['d']||
+    keys['arrowup']||keys['arrowdown']||keys['arrowleft']||keys['arrowright']);
+}
+
 let lastT = null;
 function loop(ts){
   if(!lastT) lastT = ts;
   let dt = (ts - lastT)/1000;
   lastT = ts;
   dt = Math.min(dt, 0.05);
+
+  if(game && game.running && game.paused && game.awaitingResume){
+    if(isMovementInputActive()){
+      game.paused = false;
+      game.awaitingResume = false;
+    }
+  }
 
   if(game && game.running && !game.paused){
     game.time += dt;
