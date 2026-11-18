@@ -153,6 +153,9 @@
   }
   .wpBtn.selected .wpSub{ color:var(--accent2); }
 
+  #gameOverBtns{
+    display:flex; gap:10px; justify-content:center; flex-wrap:wrap;
+  }
   #autoSelectToggleLink{
     margin-top:16px; width:100%; padding:9px; font-size:12px;
     font-weight:600; letter-spacing:0.3px;
@@ -346,7 +349,10 @@
       <div><div class="val" id="resLevel">1</div><div class="lab">เลเวล</div></div>
       <div><div class="val" id="resKills">0</div><div class="lab">ศัตรูที่ฆ่า</div></div>
     </div>
-    <button class="btn" id="restartBtn">🔄 เล่นใหม่</button>
+    <div id="gameOverBtns">
+      <button class="btn" id="restartBtn">🔄 เล่นใหม่</button>
+      <button class="btn secondary" id="menuBtn">🏠 กลับหน้าแรก</button>
+    </div>
   </div>
 </div>
 
@@ -1797,6 +1803,15 @@ function endGame(g){
 
 document.getElementById('startBtn').onclick = startGame;
 document.getElementById('restartBtn').onclick = startGame;
+document.getElementById('menuBtn').onclick = function(){
+  game = null;
+  ctx.fillStyle = '#0a0e1a';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  document.getElementById('gameOverOverlay').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('weaponBar').classList.add('hidden');
+  document.getElementById('startOverlay').classList.remove('hidden');
+};
 
 document.querySelectorAll('.diffBtn').forEach(btn=>{
   btn.addEventListener('click', function(){
