@@ -1611,6 +1611,58 @@ function render(g){
     ctx.restore();
   }
 
+  // off-screen item indicators: arrows at the screen edge pointing to dropped items
+  {
+    const vs = getViewScale();
+    const cx = canvas.width/2, cy = canvas.height/2;
+    const left = 32, right = canvas.width-32, top = 100, bottom = canvas.height-34;
+    const pulse = 1 + Math.sin(g.time*6)*0.12;
+    for(const it of g.items){
+      const sx = cx + (it.x - g.player.x)*vs;
+      const sy = cy + (it.y - g.player.y)*vs;
+      if(sx > 0 && sx < canvas.width && sy > 0 && sy < canvas.height) continue; // already visible
+
+      const dx = sx - cx, dy = sy - cy;
+      const tx = dx > 0 ? (right-cx)/dx : (dx < 0 ? (left-cx)/dx : Infinity);
+      const ty = dy > 0 ? (bottom-cy)/dy : (dy < 0 ? (top-cy)/dy : Infinity);
+      const t = Math.min(tx, ty);
+      const ax = cx + dx*t, ay = cy + dy*t;
+      const ang = Math.atan2(dy, dx);
+      const def = ITEM_DEFS[it.type];
+      const rare = (it.type === 'chest' || it.type === 'evocore');
+      const scale = rare ? pulse : 1;
+
+      ctx.save();
+      ctx.translate(ax, ay);
+      ctx.globalAlpha = rare ? 0.95 : 0.8;
+
+      // arrow pointing outward toward the item
+      ctx.save();
+      ctx.rotate(ang);
+      ctx.fillStyle = def.color;
+      ctx.shadowColor = def.color; ctx.shadowBlur = rare ? 14 : 8;
+      ctx.beginPath();
+      ctx.moveTo(24*scale, 0);
+      ctx.lineTo(13*scale, -8*scale);
+      ctx.lineTo(13*scale, 8*scale);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+
+      // icon badge
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(10,14,26,0.85)';
+      ctx.strokeStyle = def.color;
+      ctx.lineWidth = rare ? 2.5 : 1.5;
+      ctx.beginPath(); ctx.arc(0, 0, 14*scale, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.font = Math.round(15*scale) + 'px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(def.icon, 0, 1);
+      ctx.restore();
+    }
+  }
+
   if(joystick.active){
     const jdx = joystick.curX - joystick.baseX;
     const jdy = joystick.curY - joystick.baseY;
