@@ -252,6 +252,25 @@
   #resultStats .val{font-size:26px;font-weight:800;color:var(--accent2);}
   #resultStats .lab{font-size:11px;color:var(--muted);}
 
+  #pauseBtn{
+    position:fixed;bottom:14px;right:14px;z-index:10;
+    background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);
+    color:var(--text);border-radius:10px;width:44px;height:44px;cursor:pointer;
+    font-size:18px;
+  }
+  #bestRecord{
+    margin-top:14px; font-size:12px; color:var(--gold); letter-spacing:0.3px;
+  }
+  #recordNote{
+    margin:2px 0 6px; font-size:12px; color:var(--muted); line-height:1.8;
+  }
+  #recordNote .newRec{
+    display:inline-block; margin-left:6px;
+    background:var(--gold); color:#3a2a06; font-weight:800;
+    font-size:10px; padding:1px 7px; border-radius:6px;
+  }
+  .pauseBtns{ display:flex; flex-direction:column; gap:8px; align-items:center; }
+  .pauseBtns .btn{ margin-top:6px; min-width:200px; }
   #muteBtn{
     position:fixed;top:14px;right:14px;z-index:10;
     background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);
@@ -285,6 +304,7 @@
 
 <div id="weaponBar" class="hidden"></div>
 <button id="muteBtn">🔊</button>
+<button id="pauseBtn" class="hidden" title="Pause (P / Esc)">⏸</button>
 
 <div id="startOverlay" class="modal-overlay">
   <div class="panel">
@@ -310,6 +330,7 @@
       <button class="diffBtn selected" data-diff="normal">⚔️ Normal<br><span class="diffSub">ปกติ</span></button>
       <button class="diffBtn" data-diff="hard">💀 Hard<br><span class="diffSub">ยาก</span></button>
     </div>
+    <div id="bestRecord"></div>
 
     <button class="btn secondary" id="autoSelectToggleLink" type="button">⚙️ ตั้งค่าเลือกอัปเกรดอัตโนมัติ</button>
     <div id="autoSelectPanel" class="hidden">
@@ -340,6 +361,18 @@
   </div>
 </div>
 
+<div id="pauseOverlay" class="modal-overlay hidden">
+  <div class="panel">
+    <h1>⏸ PAUSED</h1>
+    <h2>พักเกมชั่วคราว</h2>
+    <div class="pauseBtns">
+      <button class="btn" id="resumeBtn">▶ เล่นต่อ</button>
+      <button class="btn secondary" id="pauseMenuBtn">🏠 กลับหน้าแรก (จบรอบนี้)</button>
+    </div>
+    <p>กด <span class="kbd">P</span> หรือ <span class="kbd">Esc</span> เพื่อหยุด/เล่นต่อ</p>
+  </div>
+</div>
+
 <div id="gameOverOverlay" class="modal-overlay hidden">
   <div class="panel">
     <h1 id="goTitle">💀 YOU DIED</h1>
@@ -349,6 +382,7 @@
       <div><div class="val" id="resLevel">1</div><div class="lab">เลเวล</div></div>
       <div><div class="val" id="resKills">0</div><div class="lab">ศัตรูที่ฆ่า</div></div>
     </div>
+    <div id="recordNote"></div>
     <div id="gameOverBtns">
       <button class="btn" id="restartBtn">🔄 เล่นใหม่</button>
       <button class="btn secondary" id="menuBtn">🏠 กลับหน้าแรก</button>
@@ -403,7 +437,11 @@ let selectedStartWeapon = 'knife';
 
 // ---------- Input ----------
 const keys = {};
-window.addEventListener('keydown', e=>{ keys[e.key.toLowerCase()]=true; });
+window.addEventListener('keydown', e=>{
+  const k = e.key.toLowerCase();
+  keys[k]=true;
+  if((k==='p' || k==='escape') && !e.repeat) togglePause();
+});
 window.addEventListener('keyup', e=>{ keys[e.key.toLowerCase()]=false; });
 
 // Virtual joystick for touch devices
@@ -526,7 +564,9 @@ function newGame(){
   return {
     running:false,
     paused:false,
+    manualPause:false,
     awaitingResume:false,
+    diffKey: selectedDifficulty,
     time:0,
     kills:0,
     wave:1,
@@ -1777,11 +1817,87 @@ function loop(ts){
 requestAnimationFrame(loop);
 
 // ---------- Start / End ----------
+// ---------- Records (saved in the browser via localStorage) ----------
+const RECORD_KEY = 'survivorArena.records.v1';
+function loadRecords(){
+  try{ return JSON.parse(localStorage.getItem(RECORD_KEY)) || {}; }catch(e){ return {}; }
+}
+function saveRecords(r){
+  try{ localStorage.setItem(RECORD_KEY, JSON.stringify(r)); }catch(e){}
+}
+function renderBestRecord(){
+  const el = document.getElementById('bestRecord');
+  const rec = loadRecords()[selectedDifficulty];
+  const label = DIFFICULTY[selectedDifficulty].label;
+  if(rec && (rec.time > 0 || rec.kills > 0)){
+    el.textContent = '🏆 สถิติสูงสุด (' + label + '): ⏱ ' + fmtTime(rec.time) + ' · 💀 ' + rec.kills + ' คิล · Lv.' + rec.level;
+  } else {
+    el.textContent = '🏆 ยังไม่มีสถิติของระดับ ' + label;
+  }
+}
+function updateRecords(g){
+  const records = loadRecords();
+  const prev = records[g.diffKey] || {time:0, kills:0, level:1};
+  const newTime = g.time > prev.time;
+  const newKills = g.kills > prev.kills;
+  const newLevel = g.player.level > prev.level;
+  records[g.diffKey] = {
+    time: Math.max(prev.time, g.time),
+    kills: Math.max(prev.kills, g.kills),
+    level: Math.max(prev.level, g.player.level)
+  };
+  saveRecords(records);
+  const best = records[g.diffKey];
+  const badge = '<span class="newRec">NEW RECORD!</span>';
+  document.getElementById('recordNote').innerHTML =
+    '🏆 สถิติสูงสุด (' + g.diff.label + ')<br>' +
+    '⏱ เวลา ' + fmtTime(best.time) + (newTime ? badge : '') + '<br>' +
+    '💀 คิล ' + best.kills + (newKills ? badge : '') + '<br>' +
+    'Lv.' + best.level + (newLevel ? badge : '');
+}
+
+// ---------- Pause ----------
+function togglePause(){
+  if(!game || !game.running) return;
+  const overlay = document.getElementById('pauseOverlay');
+  if(game.manualPause){
+    game.manualPause = false;
+    game.paused = false;
+    overlay.classList.add('hidden');
+  } else {
+    if(game.paused) return; // level-up / evolve menu or waiting-to-move state already pausing
+    game.manualPause = true;
+    game.paused = true;
+    overlay.classList.remove('hidden');
+  }
+}
+document.addEventListener('visibilitychange', function(){
+  if(document.hidden) togglePauseIfRunning();
+});
+function togglePauseIfRunning(){
+  if(game && game.running && !game.paused) togglePause();
+}
+
+function goToMenu(){
+  game = null;
+  ctx.fillStyle = '#0a0e1a';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  document.getElementById('gameOverOverlay').classList.add('hidden');
+  document.getElementById('pauseOverlay').classList.add('hidden');
+  document.getElementById('hud').classList.add('hidden');
+  document.getElementById('weaponBar').classList.add('hidden');
+  document.getElementById('pauseBtn').classList.add('hidden');
+  document.getElementById('startOverlay').classList.remove('hidden');
+  renderBestRecord();
+}
+
 function startGame(){
   ensureAudio();
   game = newGame();
   game.running = true;
   game.paused = false;
+  document.getElementById('pauseOverlay').classList.add('hidden');
+  document.getElementById('pauseBtn').classList.remove('hidden');
   document.getElementById('startOverlay').classList.add('hidden');
   document.getElementById('gameOverOverlay').classList.add('hidden');
   document.getElementById('hud').classList.remove('hidden');
@@ -1798,26 +1914,25 @@ function endGame(g){
   document.getElementById('resKills').textContent = g.kills;
   document.getElementById('hud').classList.add('hidden');
   document.getElementById('weaponBar').classList.add('hidden');
+  document.getElementById('pauseBtn').classList.add('hidden');
+  updateRecords(g);
   setTimeout(()=>{ document.getElementById('gameOverOverlay').classList.remove('hidden'); }, 400);
 }
 
 document.getElementById('startBtn').onclick = startGame;
 document.getElementById('restartBtn').onclick = startGame;
-document.getElementById('menuBtn').onclick = function(){
-  game = null;
-  ctx.fillStyle = '#0a0e1a';
-  ctx.fillRect(0,0,canvas.width,canvas.height);
-  document.getElementById('gameOverOverlay').classList.add('hidden');
-  document.getElementById('hud').classList.add('hidden');
-  document.getElementById('weaponBar').classList.add('hidden');
-  document.getElementById('startOverlay').classList.remove('hidden');
-};
+document.getElementById('menuBtn').onclick = goToMenu;
+document.getElementById('pauseBtn').onclick = togglePause;
+document.getElementById('resumeBtn').onclick = togglePause;
+document.getElementById('pauseMenuBtn').onclick = goToMenu;
+renderBestRecord();
 
 document.querySelectorAll('.diffBtn').forEach(btn=>{
   btn.addEventListener('click', function(){
     document.querySelectorAll('.diffBtn').forEach(b=>b.classList.remove('selected'));
     this.classList.add('selected');
     selectedDifficulty = this.dataset.diff;
+    renderBestRecord();
   });
 });
 
